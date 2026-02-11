@@ -8,6 +8,7 @@ export default function TransactionUI() {
   const [partyId, setPartyId] = useState("");
   const [payload, setPayload] = useState('{\n  "amount": 100,\n  "currency": "AED"\n}');
   const [transactionId, setTransactionId] = useState("");
+  const [lookupId, setLookupId] = useState("");
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -56,7 +57,7 @@ export default function TransactionUI() {
     setLoading(true);
 
     try {
-      const response = await fetch(`${API_URL}/tx/${transactionId}`);
+      const response = await fetch(`${API_URL}/tx/${lookupId}`);
       const data = await response.json();
 
       if (!response.ok) {
@@ -80,7 +81,7 @@ export default function TransactionUI() {
     setLoading(true);
 
     try {
-      const response = await fetch(`${API_URL}/tx/${transactionId}/decrypt`, {
+      const response = await fetch(`${API_URL}/tx/${lookupId}/decrypt`, {
         method: "POST",
       });
       const data = await response.json();
@@ -101,71 +102,97 @@ export default function TransactionUI() {
   };
 
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl p-8">
-      {/* Input Section */}
-      <div className="space-y-6 mb-8">
-        <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Party ID
-          </label>
-          <input
-            type="text"
-            value={partyId}
-            onChange={(e) => setPartyId(e.target.value)}
-            placeholder="party_123"
-            className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
-          />
-        </div>
+    <div className="space-y-8">
+      {/* Create New Transaction Section */}
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl p-8">
+        <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-6">
+          Create New Transaction
+        </h2>
+        
+        <div className="space-y-6 mb-6">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Party ID
+            </label>
+            <input
+              type="text"
+              value={partyId}
+              onChange={(e) => setPartyId(e.target.value)}
+              placeholder="party_123"
+              className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+            />
+          </div>
 
-        <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            JSON Payload
-          </label>
-          <textarea
-            value={payload}
-            onChange={(e) => setPayload(e.target.value)}
-            rows={6}
-            className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg font-mono text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
-          />
-        </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              JSON Payload
+            </label>
+            <textarea
+              value={payload}
+              onChange={(e) => setPayload(e.target.value)}
+              rows={6}
+              className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg font-mono text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
+            />
+          </div>
 
-        <div>
-          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-            Transaction ID
-          </label>
-          <input
-            type="text"
-            value={transactionId}
-            onChange={(e) => setTransactionId(e.target.value)}
-            placeholder="Generated after encryption"
-            className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-slate-700 dark:text-white"
-          />
+          <button
+            onClick={handleEncrypt}
+            disabled={loading || !partyId || !payload}
+            className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            🔒 Encrypt & Save
+          </button>
+
+          {transactionId && (
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                Generated Transaction ID
+              </label>
+              <div className="w-full px-4 py-2 border border-green-300 dark:border-green-600 bg-green-50 dark:bg-green-900/20 rounded-lg text-slate-900 dark:text-slate-100 font-mono text-sm break-all">
+                {transactionId}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Action Buttons */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <button
-          onClick={handleEncrypt}
-          disabled={loading || !partyId || !payload}
-          className="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          🔒 Encrypt & Save
-        </button>
-        <button
-          onClick={handleFetch}
-          disabled={loading || !transactionId}
-          className="px-6 py-3 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          📦 Fetch Record
-        </button>
-        <button
-          onClick={handleDecrypt}
-          disabled={loading || !transactionId}
-          className="px-6 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          🔓 Decrypt Record
-        </button>
+      {/* Lookup Existing Transaction Section */}
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl p-8">
+        <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-6">
+          Lookup Existing Transaction
+        </h2>
+        
+        <div className="space-y-6">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+              Transaction ID
+            </label>
+            <input
+              type="text"
+              value={lookupId}
+              onChange={(e) => setLookupId(e.target.value)}
+              placeholder="Enter transaction ID to lookup"
+              className="w-full px-4 py-2 border border-slate-300 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent dark:bg-slate-700 dark:text-white font-mono text-sm"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <button
+              onClick={handleFetch}
+              disabled={loading || !lookupId}
+              className="px-6 py-3 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              📦 Fetch Record
+            </button>
+            <button
+              onClick={handleDecrypt}
+              disabled={loading || !lookupId}
+              className="px-6 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              🔓 Decrypt Record
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Loading State */}
@@ -178,7 +205,7 @@ export default function TransactionUI() {
 
       {/* Error Display */}
       {error && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-8">
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
           <p className="text-red-800 dark:text-red-200 font-medium">❌ Error</p>
           <p className="text-red-600 dark:text-red-300 text-sm mt-1">{error}</p>
         </div>
