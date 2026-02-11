@@ -329,7 +329,7 @@ pnpm --filter @repo/crypto build
 # Start both servers
 pnpm dev
 
-# Visit http://localhost:3000
+# Visit http://localhost:5000
 ```
 
 ## 🎯 Mission Accomplished

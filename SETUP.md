@@ -8,7 +8,7 @@ This is a complete Secure Transactions Mini-App using TurboRepo, Fastify, Next.j
 mirfa-intern-challenge/
 ├── apps/
 │   ├── api/              → Fastify backend (port 3001)
-│   └── web/my-app/       → Next.js frontend (port 3000)
+│   └── web/my-app/       → Next.js frontend (port 5000)
 ├── packages/
 │   └── crypto/           → Shared encryption logic (AES-256-GCM)
 ├── turbo.json            → TurboRepo pipeline config
@@ -59,7 +59,7 @@ pnpm dev
 
 This will start:
 - API server at http://localhost:3001
-- Web app at http://localhost:3000
+- Web app at http://localhost:5000
 
 ## 🔐 How It Works
 
@@ -128,7 +128,7 @@ This will start:
 
 ## 🧪 Testing the App
 
-1. Open http://localhost:3000
+1. Open http://localhost:5000
 2. Enter a Party ID (e.g., `party_123`)
 3. Edit the JSON payload (e.g., `{"amount": 100, "currency": "AED"}`)
 4. Click **🔒 Encrypt & Save** - Note the transaction ID generated

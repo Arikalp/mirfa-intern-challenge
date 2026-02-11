@@ -244,7 +244,7 @@ pnpm dev
 ```
 
 Then open:
-- **Frontend:** http://localhost:3000
+- **Frontend:** http://localhost:5000
 - **API:** http://localhost:3001
 
 ### 📁 What's Been Built

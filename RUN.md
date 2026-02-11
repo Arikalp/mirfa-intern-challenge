@@ -83,18 +83,18 @@ pnpm dev
 
 This starts BOTH:
 - **API Server** at http://localhost:3001
-- **Web App** at http://localhost:3000
+- **Web App** at http://localhost:5000
 
 **Expected output:**
 ```
 • api:dev: ready started server on [::]:3001
 • web:dev: ▲ Next.js 16.x.x
-• web:dev: - Local: http://localhost:3000
+• web:dev: - Local: http://localhost:5000
 ```
 
 ### Step 5: Test the Application
 
-1. **Open your browser** to http://localhost:3000
+1. **Open your browser** to http://localhost:5000
 
 2. **Encrypt a Transaction:**
    - Party ID: `party_123`
@@ -243,7 +243,7 @@ pnpm build
 
 **Solution:** Ensure `apps/api/.env` exists with the master key.
 
-### Port 3001 or 3000 already in use
+### Port 3001 or 5000 already in use
 
 **Solution:** Kill the process or change ports:
 ```powershell

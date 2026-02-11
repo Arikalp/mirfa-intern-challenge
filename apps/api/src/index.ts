@@ -1,3 +1,4 @@
+import "dotenv/config";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { encryptEnvelope, decryptEnvelope, TxSecureRecord } from "@repo/crypto";
