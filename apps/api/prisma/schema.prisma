@@ -1,0 +1,27 @@
+// Prisma schema for secure transaction storage
+// This defines the database structure for storing encrypted transactions
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Transaction model - stores encrypted transaction data
+// Each transaction contains encrypted payload and metadata for secure retrieval
+model Transaction {
+  id            String   @id @default(uuid())  // Unique identifier
+  partyId       String                          // Party identifier in plaintext for querying
+  encryptedDek  String                          // Encrypted Data Encryption Key (hex)
+  dekWrapNonce  String                          // Nonce used to encrypt DEK (hex)
+  dekWrapTag    String                          // Auth tag for DEK encryption (hex)
+  encryptedData String                          // Encrypted transaction payload (hex)
+  iv            String                          // Initialization Vector for payload (hex)
+  authTag       String                          // Authentication tag for payload (hex)
+  createdAt     DateTime @default(now())        // Timestamp of creation
+  
+  @@index([partyId])  // Index for faster party-based queries
+}

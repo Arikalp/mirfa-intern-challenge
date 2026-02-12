@@ -14,6 +14,7 @@
 import "dotenv/config";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
+import { PrismaClient } from "@prisma/client";
 import { encryptEnvelope, decryptEnvelope, TxSecureRecord } from "@repo/crypto";
 
 // Initialize Fastify server with logging enabled
@@ -27,14 +28,10 @@ fastify.register(cors, {
 });
 
 /**
- * In-memory storage for encrypted transaction records
- * Key: Transaction ID (UUID)
- * Value: Encrypted transaction record
- * 
- * Note: In production, this should be replaced with a persistent database
- * like PostgreSQL, MongoDB, or Redis
+ * Prisma Client for PostgreSQL database access
+ * Provides type-safe database queries for encrypted transaction records
  */
-const txStore = new Map<string, TxSecureRecord>();
+const prisma = new PrismaClient();
 
 /**
  * POST /tx/encrypt
@@ -84,8 +81,19 @@ fastify.post<{
     // Perform envelope encryption (generates DEK, encrypts payload, wraps DEK with master key)
     const record = encryptEnvelope(partyId, payload);
 
-    // Store encrypted record in memory
-    txStore.set(record.id, record);
+    // Store encrypted record in PostgreSQL database
+    await prisma.transaction.create({
+      data: {
+        id: record.id,
+        partyId: record.partyId,
+        encryptedDek: record.dek_wrapped,
+        dekWrapNonce: record.dek_wrap_nonce,
+        dekWrapTag: record.dek_wrap_tag,
+        encryptedData: record.payload_ct,
+        iv: record.payload_nonce,
+        authTag: record.payload_tag,
+      },
+    });
 
     // Log successful encryption
     fastify.log.info(`Encrypted transaction ${record.id} for party ${partyId}`);
@@ -140,15 +148,32 @@ fastify.get<{
 }>("/tx/:id", async (request, reply) => {
   const { id } = request.params;
 
-  // Lookup transaction in store
-  const record = txStore.get(id);
+  // Lookup transaction in database
+  const dbRecord = await prisma.transaction.findUnique({
+    where: { id },
+  });
 
   // Return 404 if transaction doesn't exist
-  if (!record) {
+  if (!dbRecord) {
     return reply.status(404).send({
       error: "Transaction not found",
     });
   }
+
+  // Convert database record to TxSecureRecord format
+  const record: TxSecureRecord = {
+    id: dbRecord.id,
+    partyId: dbRecord.partyId,
+    payload_nonce: dbRecord.iv,
+    payload_ct: dbRecord.encryptedData,
+    payload_tag: dbRecord.authTag,
+    dek_wrap_nonce: dbRecord.dekWrapNonce,
+    dek_wrapped: dbRecord.encryptedDek,
+    dek_wrap_tag: dbRecord.dekWrapTag,
+    alg: "AES-256-GCM",
+    mk_version: 1,
+    createdAt: dbRecord.createdAt.toISOString(),
+  };
 
   // Log successful retrieval
   fastify.log.info(`Retrieved encrypted transaction ${id}`);
@@ -187,15 +212,32 @@ fastify.post<{
   try {
     const { id } = request.params;
 
-    // Lookup transaction in store
-    const record = txStore.get(id);
+    // Lookup transaction in database
+    const dbRecord = await prisma.transaction.findUnique({
+      where: { id },
+    });
 
     // Return 404 if transaction doesn't exist
-    if (!record) {
+    if (!dbRecord) {
       return reply.status(404).send({
         error: "Transaction not found",
       });
     }
+
+    // Convert database record to TxSecureRecord format for decryption
+    const record: TxSecureRecord = {
+      id: dbRecord.id,
+      partyId: dbRecord.partyId,
+      payload_nonce: dbRecord.iv,
+      payload_ct: dbRecord.encryptedData,
+      payload_tag: dbRecord.authTag,
+      dek_wrap_nonce: dbRecord.dekWrapNonce,
+      dek_wrapped: dbRecord.encryptedDek,
+      dek_wrap_tag: dbRecord.dekWrapTag,
+      alg: "AES-256-GCM",
+      mk_version: 1,
+      createdAt: dbRecord.createdAt.toISOString(),
+    };
 
     // Perform envelope decryption (unwrap DEK, decrypt payload)
     const payload = decryptEnvelope(record);
@@ -229,14 +271,26 @@ fastify.post<{
  * Response:
  * {
  *   "status": "ok",
+ *   "database": "connected",
  *   "timestamp": "ISO timestamp"
  * }
  */
 fastify.get("/health", async () => {
-  return { 
-    status: "ok", 
-    timestamp: new Date().toISOString() 
-  };
+  try {
+    // Check database connection
+    await prisma.$queryRaw`SELECT 1`;
+    return { 
+      status: "ok",
+      database: "connected",
+      timestamp: new Date().toISOString() 
+    };
+  } catch (error) {
+    return { 
+      status: "ok",
+      database: "disconnected",
+      timestamp: new Date().toISOString() 
+    };
+  }
 });
 
 /**
