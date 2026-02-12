@@ -1,0 +1,15 @@
+{
+  "version": 2,
+  "buildCommand": "pnpm db:generate && pnpm build",
+  "installCommand": "cd ../.. && pnpm install --filter=api...",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/api"
+    }
+  ],
+  "env": {
+    "MASTER_KEY_HEX": "@master-key-hex",
+    "DATABASE_URL": "@database-url"
+  }
+}
