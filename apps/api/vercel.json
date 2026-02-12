@@ -1,7 +1,9 @@
 {
   "version": 2,
-  "buildCommand": "cd ../.. && pnpm install --filter=api... && cd apps/api && pnpm db:generate && pnpm build",
-  "installCommand": "cd ../.. && pnpm install --filter=api...",
+  "installCommand": "cd ../.. && pnpm install",
+  "buildCommand": "cd ../.. && pnpm prisma generate --schema=apps/api/prisma/schema.prisma && pnpm turbo build --filter=api",
+  "devCommand": "pnpm dev",
+  "framework": null,
   "rewrites": [
     {
       "source": "/(.*)",
