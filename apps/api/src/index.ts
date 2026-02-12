@@ -1,23 +1,62 @@
+/**
+ * Secure Transaction API Server
+ * 
+ * Fastify-based REST API for encrypting, storing, and decrypting transaction payloads
+ * using AES-256-GCM envelope encryption pattern.
+ * 
+ * Endpoints:
+ * - POST /tx/encrypt - Encrypt and store a transaction
+ * - GET /tx/:id - Retrieve encrypted transaction record
+ * - POST /tx/:id/decrypt - Decrypt and return original payload
+ * - GET /health - Health check endpoint
+ */
+
 import "dotenv/config";
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import { encryptEnvelope, decryptEnvelope, TxSecureRecord } from "@repo/crypto";
 
+// Initialize Fastify server with logging enabled
 const fastify = Fastify({
   logger: true,
 });
 
-// Enable CORS for frontend
+// Enable CORS to allow frontend connections from any origin
 fastify.register(cors, {
   origin: true,
 });
 
-// In-memory storage for encrypted records
+/**
+ * In-memory storage for encrypted transaction records
+ * Key: Transaction ID (UUID)
+ * Value: Encrypted transaction record
+ * 
+ * Note: In production, this should be replaced with a persistent database
+ * like PostgreSQL, MongoDB, or Redis
+ */
 const txStore = new Map<string, TxSecureRecord>();
 
 /**
  * POST /tx/encrypt
- * Encrypts payload and stores encrypted record
+ * 
+ * Encrypts a JSON payload using AES-256-GCM envelope encryption and stores it.
+ * 
+ * Request Body:
+ * {
+ *   "partyId": "party_123",
+ *   "payload": { "amount": 100, "currency": "AED" }
+ * }
+ * 
+ * Response:
+ * {
+ *   "id": "uuid-of-transaction",
+ *   "message": "Transaction encrypted and stored successfully"
+ * }
+ * 
+ * Status Codes:
+ * - 200: Success
+ * - 400: Invalid request (missing or invalid partyId/payload)
+ * - 500: Encryption failure
  */
 fastify.post<{
   Body: {
@@ -28,31 +67,36 @@ fastify.post<{
   try {
     const { partyId, payload } = request.body;
 
+    // Validate partyId field
     if (!partyId || typeof partyId !== "string") {
       return reply.status(400).send({
         error: "partyId is required and must be a string",
       });
     }
 
+    // Validate payload field
     if (!payload || typeof payload !== "object") {
       return reply.status(400).send({
         error: "payload is required and must be an object",
       });
     }
 
-    // Encrypt using envelope encryption
+    // Perform envelope encryption (generates DEK, encrypts payload, wraps DEK with master key)
     const record = encryptEnvelope(partyId, payload);
 
-    // Store in memory
+    // Store encrypted record in memory
     txStore.set(record.id, record);
 
+    // Log successful encryption
     fastify.log.info(`Encrypted transaction ${record.id} for party ${partyId}`);
 
+    // Return transaction ID and success message
     return {
       id: record.id,
       message: "Transaction encrypted and stored successfully",
     };
   } catch (error) {
+    // Log and return encryption error
     fastify.log.error(error);
     return reply.status(500).send({
       error: "Encryption failed",
@@ -63,7 +107,31 @@ fastify.post<{
 
 /**
  * GET /tx/:id
- * Returns encrypted record (no decryption)
+ * 
+ * Retrieves an encrypted transaction record without decrypting it.
+ * Useful for inspecting the encrypted structure or transferring encrypted data.
+ * 
+ * URL Parameters:
+ * - id: Transaction UUID
+ * 
+ * Response: TxSecureRecord (encrypted form)
+ * {
+ *   "id": "uuid",
+ *   "partyId": "party_123",
+ *   "payload_nonce": "...",
+ *   "payload_ct": "...",
+ *   "payload_tag": "...",
+ *   "dek_wrap_nonce": "...",
+ *   "dek_wrapped": "...",
+ *   "dek_wrap_tag": "...",
+ *   "alg": "AES-256-GCM",
+ *   "mk_version": 1,
+ *   "createdAt": "ISO timestamp"
+ * }
+ * 
+ * Status Codes:
+ * - 200: Success
+ * - 404: Transaction not found
  */
 fastify.get<{
   Params: {
@@ -72,22 +140,44 @@ fastify.get<{
 }>("/tx/:id", async (request, reply) => {
   const { id } = request.params;
 
+  // Lookup transaction in store
   const record = txStore.get(id);
 
+  // Return 404 if transaction doesn't exist
   if (!record) {
     return reply.status(404).send({
       error: "Transaction not found",
     });
   }
 
+  // Log successful retrieval
   fastify.log.info(`Retrieved encrypted transaction ${id}`);
 
+  // Return encrypted record (no decryption performed)
   return record;
 });
 
 /**
  * POST /tx/:id/decrypt
- * Decrypts and returns original payload
+ * 
+ * Decrypts an encrypted transaction and returns the original payload.
+ * Performs DEK unwrapping and payload decryption using envelope encryption.
+ * 
+ * URL Parameters:
+ * - id: Transaction UUID
+ * 
+ * Response:
+ * {
+ *   "id": "uuid",
+ *   "partyId": "party_123",
+ *   "createdAt": "ISO timestamp",
+ *   "payload": { "amount": 100, "currency": "AED" }
+ * }
+ * 
+ * Status Codes:
+ * - 200: Success
+ * - 404: Transaction not found
+ * - 500: Decryption failure (invalid keys, tampered data, etc.)
  */
 fastify.post<{
   Params: {
@@ -97,19 +187,23 @@ fastify.post<{
   try {
     const { id } = request.params;
 
+    // Lookup transaction in store
     const record = txStore.get(id);
 
+    // Return 404 if transaction doesn't exist
     if (!record) {
       return reply.status(404).send({
         error: "Transaction not found",
       });
     }
 
-    // Decrypt envelope
+    // Perform envelope decryption (unwrap DEK, decrypt payload)
     const payload = decryptEnvelope(record);
 
+    // Log successful decryption
     fastify.log.info(`Decrypted transaction ${id}`);
 
+    // Return decrypted payload with metadata
     return {
       id: record.id,
       partyId: record.partyId,
@@ -117,6 +211,7 @@ fastify.post<{
       payload,
     };
   } catch (error) {
+    // Log and return decryption error
     fastify.log.error(error);
     return reply.status(500).send({
       error: "Decryption failed",
@@ -126,26 +221,51 @@ fastify.post<{
 });
 
 /**
- * Health check endpoint
+ * GET /health
+ * 
+ * Health check endpoint for monitoring server status.
+ * Useful for load balancers, container orchestration, and monitoring tools.
+ * 
+ * Response:
+ * {
+ *   "status": "ok",
+ *   "timestamp": "ISO timestamp"
+ * }
  */
 fastify.get("/health", async () => {
-  return { status: "ok", timestamp: new Date().toISOString() };
+  return { 
+    status: "ok", 
+    timestamp: new Date().toISOString() 
+  };
 });
 
 /**
- * Start server
+ * Start the Fastify server
+ * 
+ * Reads configuration from environment variables:
+ * - PORT: Server port (default: 3001)
+ * - HOST: Server host (default: 0.0.0.0)
+ * - MASTER_KEY_HEX: 32-byte master key for encryption (required)
  */
 const start = async () => {
   try {
+    // Read port from environment or use default
     const port = process.env.PORT ? parseInt(process.env.PORT) : 3001;
+    
+    // Read host from environment or use default (0.0.0.0 allows external connections)
     const host = process.env.HOST || "0.0.0.0";
 
+    // Start listening on specified port and host
     await fastify.listen({ port, host });
+    
+    // Log server start message
     console.log(`🚀 API server running on http://${host}:${port}`);
   } catch (err) {
+    // Log error and exit process if server fails to start
     fastify.log.error(err);
     process.exit(1);
   }
 };
 
+// Initialize server
 start();

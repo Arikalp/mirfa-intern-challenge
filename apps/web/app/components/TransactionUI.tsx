@@ -2,26 +2,55 @@
 
 import { useState } from "react";
 
+// API base URL - configurable via environment variable
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
+/**
+ * TransactionUI Component
+ * 
+ * Main UI component for the Secure Transaction Mini-App.
+ * Provides interface for:
+ * - Creating and encrypting new transactions
+ * - Fetching encrypted transaction records
+ * - Decrypting stored transactions
+ * 
+ * Uses React hooks for state management and async API calls.
+ */
 export default function TransactionUI() {
-  const [partyId, setPartyId] = useState("");
-  const [payload, setPayload] = useState('{\n  "amount": 100,\n  "currency": "AED"\n}');
-  const [transactionId, setTransactionId] = useState("");
-  const [lookupId, setLookupId] = useState("");
-  const [result, setResult] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  // === Form State ===
+  const [partyId, setPartyId] = useState("");                                      // Party ID input
+  const [payload, setPayload] = useState('{\n  "amount": 100,\n  "currency": "AED"\n}'); // JSON payload input
+  
+  // === Transaction State ===
+  const [transactionId, setTransactionId] = useState("");                          // Last created transaction ID
+  const [lookupId, setLookupId] = useState("");                                    // Transaction ID for lookup/decrypt
+  
+  // === UI State ===
+  const [result, setResult] = useState<any>(null);                                 // API response data
+  const [loading, setLoading] = useState(false);                                   // Loading indicator
+  const [error, setError] = useState("");                                          // Error message
 
+  /**
+   * Handle encryption of a new transaction
+   * 
+   * Steps:
+   * 1. Validate JSON payload format
+   * 2. Send POST request to /tx/encrypt endpoint
+   * 3. Store returned transaction ID
+   * 4. Display success result
+   */
   const handleEncrypt = async () => {
+    // Reset UI state
     setError("");
     setResult(null);
     setLoading(true);
 
     try {
-      // Validate JSON
+      // Validate and parse JSON payload
+      // This will throw if JSON is malformed
       const parsedPayload = JSON.parse(payload);
 
+      // Make API request to encrypt endpoint
       const response = await fetch(`${API_URL}/tx/encrypt`, {
         method: "POST",
         headers: {
@@ -35,68 +64,98 @@ export default function TransactionUI() {
 
       const data = await response.json();
 
+      // Check for HTTP error status
       if (!response.ok) {
         throw new Error(data.error || "Encryption failed");
       }
 
+      // Store transaction ID for easy reference
       setTransactionId(data.id);
+      
+      // Display success result
       setResult({
         type: "encrypt",
         data,
       });
     } catch (err) {
+      // Display error message (either from API or JSON parsing)
       setError((err as Error).message);
     } finally {
+      // Always stop loading indicator
       setLoading(false);
     }
   };
 
+  /**
+   * Handle fetching an encrypted transaction record
+   * 
+   * Retrieves the encrypted record WITHOUT decrypting it.
+   * Useful for inspecting the encrypted structure.
+   */
   const handleFetch = async () => {
+    // Reset UI state
     setError("");
     setResult(null);
     setLoading(true);
 
     try {
+      // Make API request to fetch encrypted record
       const response = await fetch(`${API_URL}/tx/${lookupId}`);
       const data = await response.json();
 
+      // Check for HTTP error status
       if (!response.ok) {
         throw new Error(data.error || "Fetch failed");
       }
 
+      // Display encrypted record
       setResult({
         type: "fetch",
         data,
       });
     } catch (err) {
+      // Display error message
       setError((err as Error).message);
     } finally {
+      // Always stop loading indicator
       setLoading(false);
     }
   };
 
+  /**
+   * Handle decryption of a stored transaction
+   * 
+   * Decrypts the transaction and returns the original payload.
+   * Uses envelope decryption (unwraps DEK, then decrypts payload).
+   */
   const handleDecrypt = async () => {
+    // Reset UI state
     setError("");
     setResult(null);
     setLoading(true);
 
     try {
+      // Make API request to decrypt endpoint
       const response = await fetch(`${API_URL}/tx/${lookupId}/decrypt`, {
         method: "POST",
       });
       const data = await response.json();
 
+      // Check for HTTP error status
       if (!response.ok) {
         throw new Error(data.error || "Decryption failed");
       }
 
+      // Display decrypted payload
       setResult({
         type: "decrypt",
         data,
       });
     } catch (err) {
+      // Display error message
       setError((err as Error).message);
     } finally {
+      // Always stop loading indicator
       setLoading(false);
     }
   };
