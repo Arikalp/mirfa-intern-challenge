@@ -11,12 +11,12 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
-    "vercel-build": "prisma generate && tsc"
+    "vercel-build": "cd ../../packages/crypto && npm install && npm run build && cd ../../apps/api && npm install --legacy-peer-deps && prisma generate && npm run build"
   },
   "dependencies": {
     "@fastify/cors": "^8.5.0",
     "@prisma/client": "^5.22.0",
-    "@repo/crypto": "workspace:*",
+    "@repo/crypto": "file:../../packages/crypto",
     "dotenv": "^17.2.4",
     "fastify": "^4.25.2"
   },
