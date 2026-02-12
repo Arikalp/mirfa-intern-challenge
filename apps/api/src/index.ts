@@ -17,21 +17,71 @@ import cors from "@fastify/cors";
 import { PrismaClient } from "@prisma/client";
 import { encryptEnvelope, decryptEnvelope, TxSecureRecord } from "@repo/crypto";
 
-// Initialize Fastify server with logging enabled
+// =============================================================================
+// CONFIGURATION
+// =============================================================================
+
+const CONFIG = {
+  port: process.env.PORT ? parseInt(process.env.PORT) : 3001,
+  host: process.env.HOST || "0.0.0.0",
+  encryption: {
+    algorithm: "AES-256-GCM" as const,
+    masterKeyVersion: 1,
+  },
+} as const;
+
+// =============================================================================
+// INITIALIZATION
+// =============================================================================
+
 const fastify = Fastify({
   logger: true,
 });
 
-// Enable CORS to allow frontend connections from any origin
 fastify.register(cors, {
   origin: true,
 });
 
-/**
- * Prisma Client for PostgreSQL database access
- * Provides type-safe database queries for encrypted transaction records
- */
 const prisma = new PrismaClient();
+
+// =============================================================================
+// HELPER FUNCTIONS
+// =============================================================================
+
+/**
+ * Convert database record to TxSecureRecord format
+ * @param dbRecord - Database transaction record
+ * @returns Properly formatted TxSecureRecord for encryption operations
+ */
+function dbRecordToTxSecureRecord(dbRecord: {
+  id: string;
+  partyId: string;
+  encryptedDek: string;
+  dekWrapNonce: string;
+  dekWrapTag: string;
+  encryptedData: string;
+  iv: string;
+  authTag: string;
+  createdAt: Date;
+}): TxSecureRecord {
+  return {
+    id: dbRecord.id,
+    partyId: dbRecord.partyId,
+    payload_nonce: dbRecord.iv,
+    payload_ct: dbRecord.encryptedData,
+    payload_tag: dbRecord.authTag,
+    dek_wrap_nonce: dbRecord.dekWrapNonce,
+    dek_wrapped: dbRecord.encryptedDek,
+    dek_wrap_tag: dbRecord.dekWrapTag,
+    alg: CONFIG.encryption.algorithm,
+    mk_version: CONFIG.encryption.masterKeyVersion,
+    createdAt: dbRecord.createdAt.toISOString(),
+  };
+}
+
+// =============================================================================
+// API ROUTES
+// =============================================================================
 
 /**
  * POST /tx/encrypt
@@ -148,37 +198,19 @@ fastify.get<{
 }>("/tx/:id", async (request, reply) => {
   const { id } = request.params;
 
-  // Lookup transaction in database
   const dbRecord = await prisma.transaction.findUnique({
     where: { id },
   });
 
-  // Return 404 if transaction doesn't exist
   if (!dbRecord) {
     return reply.status(404).send({
       error: "Transaction not found",
     });
   }
 
-  // Convert database record to TxSecureRecord format
-  const record: TxSecureRecord = {
-    id: dbRecord.id,
-    partyId: dbRecord.partyId,
-    payload_nonce: dbRecord.iv,
-    payload_ct: dbRecord.encryptedData,
-    payload_tag: dbRecord.authTag,
-    dek_wrap_nonce: dbRecord.dekWrapNonce,
-    dek_wrapped: dbRecord.encryptedDek,
-    dek_wrap_tag: dbRecord.dekWrapTag,
-    alg: "AES-256-GCM",
-    mk_version: 1,
-    createdAt: dbRecord.createdAt.toISOString(),
-  };
-
-  // Log successful retrieval
+  const record = dbRecordToTxSecureRecord(dbRecord);
   fastify.log.info(`Retrieved encrypted transaction ${id}`);
 
-  // Return encrypted record (no decryption performed)
   return record;
 });
 
@@ -212,40 +244,21 @@ fastify.post<{
   try {
     const { id } = request.params;
 
-    // Lookup transaction in database
     const dbRecord = await prisma.transaction.findUnique({
       where: { id },
     });
 
-    // Return 404 if transaction doesn't exist
     if (!dbRecord) {
       return reply.status(404).send({
         error: "Transaction not found",
       });
     }
 
-    // Convert database record to TxSecureRecord format for decryption
-    const record: TxSecureRecord = {
-      id: dbRecord.id,
-      partyId: dbRecord.partyId,
-      payload_nonce: dbRecord.iv,
-      payload_ct: dbRecord.encryptedData,
-      payload_tag: dbRecord.authTag,
-      dek_wrap_nonce: dbRecord.dekWrapNonce,
-      dek_wrapped: dbRecord.encryptedDek,
-      dek_wrap_tag: dbRecord.dekWrapTag,
-      alg: "AES-256-GCM",
-      mk_version: 1,
-      createdAt: dbRecord.createdAt.toISOString(),
-    };
-
-    // Perform envelope decryption (unwrap DEK, decrypt payload)
+    const record = dbRecordToTxSecureRecord(dbRecord);
     const payload = decryptEnvelope(record);
 
-    // Log successful decryption
     fastify.log.info(`Decrypted transaction ${id}`);
 
-    // Return decrypted payload with metadata
     return {
       id: record.id,
       partyId: record.partyId,
@@ -253,7 +266,6 @@ fastify.post<{
       payload,
     };
   } catch (error) {
-    // Log and return decryption error
     fastify.log.error(error);
     return reply.status(500).send({
       error: "Decryption failed",
@@ -293,33 +305,18 @@ fastify.get("/health", async () => {
   }
 });
 
-/**
- * Start the Fastify server
- * 
- * Reads configuration from environment variables:
- * - PORT: Server port (default: 3001)
- * - HOST: Server host (default: 0.0.0.0)
- * - MASTER_KEY_HEX: 32-byte master key for encryption (required)
- */
+// =============================================================================
+// SERVER STARTUP
+// =============================================================================
+
 const start = async () => {
   try {
-    // Read port from environment or use default
-    const port = process.env.PORT ? parseInt(process.env.PORT) : 3001;
-    
-    // Read host from environment or use default (0.0.0.0 allows external connections)
-    const host = process.env.HOST || "0.0.0.0";
-
-    // Start listening on specified port and host
-    await fastify.listen({ port, host });
-    
-    // Log server start message
-    console.log(`🚀 API server running on http://${host}:${port}`);
+    await fastify.listen({ port: CONFIG.port, host: CONFIG.host });
+    console.log(`🚀 API server running on http://${CONFIG.host}:${CONFIG.port}`);
   } catch (err) {
-    // Log error and exit process if server fails to start
     fastify.log.error(err);
     process.exit(1);
   }
 };
 
-// Initialize server
 start();
