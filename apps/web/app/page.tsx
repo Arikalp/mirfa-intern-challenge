@@ -56,7 +56,24 @@ export default function Home() {
         {/* Footer */}
         <footer className="mt-16 text-center text-sm text-[#9CA3AF] space-y-1">
           <p>Built with Next.js, Fastify, TurboRepo, and Node.js crypto</p>
-          <p>Developed by Sankalp with love ❤️</p>
+          <p>
+            Developed by{' '}
+            <a 
+              href="https://arikalp.vercel.app/" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="font-semibold hover:opacity-80 transition-opacity"
+              style={{ 
+                background: 'linear-gradient(135deg, #60A5FA, #A78BFA)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                backgroundClip: 'text'
+              }}
+            >
+              Sankalp
+            </a>
+            {' '}with love ❤️
+          </p>
         </footer>
       </main>
     </div>
