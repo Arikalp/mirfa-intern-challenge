@@ -10,7 +10,7 @@ A production-ready TurboRepo monorepo implementing AES-256-GCM envelope encrypti
 
 - **Frontend**: [https://securo.vercel.app](https://securo.vercel.app)
 - **API**: [https://mirfa-backend.vercel.app](https://mirfa-backend.vercel.app)
-- **Video Walkthrough**: [Loom Video](https://loom.com/your-video-link) _(Add your recording)_
+- **Video Walkthrough**: [Loom Video](https://www.loom.com/share/a655a26bfd444f6f8a185f15817b2d8a)
 
 ---
 
